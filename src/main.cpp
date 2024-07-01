@@ -54,6 +54,25 @@ String mode_str = "M";
 int16_t blackGroundColor = TFT_BLACK;
 String current_modee = "N";
 
+
+bool is_changed_A = false;
+bool is_changed_M = false;
+
+struct Button
+{
+  const uint8_t PIN;
+  bool pressed;
+};
+Button top_button = {35, false};
+
+void IRAM_ATTR IO_INT_ISR()
+{
+  // Toggle The state machine
+  // top_button.pressed = true;
+  tft.fillScreen(blackGroundColor);
+}
+
+
 #define RCCHECK(fn)              \
   {                              \
     rcl_ret_t temp_rc = fn;      \
@@ -90,14 +109,14 @@ void error_loop()
 void sub_state_callback(const void *msgin)
 {
   const std_msgs__msg__Int8 *state_msg = (const std_msgs__msg__Int8 *)msgin;
-  tft.fillScreen(blackGroundColor);
+  // tft.fillScreen(blackGroundColor);
   // (condition) ? (true exec):(false exec)
 }
 
 void sub_force_callback(const void *msgin)
 {
   const std_msgs__msg__Int16 *force_msg = (const std_msgs__msg__Int16 *)msgin;
-  tft.fillScreen(blackGroundColor);
+  // tft.fillScreen(blackGroundColor);
   // (condition) ? (true exec):(false exec)
 }
 
@@ -106,18 +125,29 @@ void sub_mode_callback(const void *msgin)
   const std_msgs__msg__String *mode_msg = (const std_msgs__msg__String *)msgin;
 
   if(mode_msg->data.data[0] == 'A'){
-    blackGroundColor = TFT_BLUE;
-    current_modee = "A";
+
+    if(is_changed_A == false){
+      blackGroundColor = TFT_BLUE;
+      current_modee = "A";
+      tft.fillScreen(blackGroundColor);
+      is_changed_A = true;
+      is_changed_M = false;
+    }
+
+
   }else if(mode_msg->data.data[0] == 'M'){
-    blackGroundColor = TFT_GREEN;
-    current_modee = "M";
+
+    if(is_changed_M == false){
+      blackGroundColor = TFT_GREEN;
+      current_modee = "M";
+      tft.fillScreen(blackGroundColor);
+      is_changed_A = false;
+      is_changed_M = true;
+    }
+
   }else{
-    blackGroundColor = TFT_RED;
     current_modee = "E";
   }
-
-
-  tft.fillScreen(blackGroundColor);
   // (condition) ? (true exec):(false exec)
 }
 
@@ -125,16 +155,20 @@ void sub_duty_callback(const void *msgin)
 {
   const std_msgs__msg__UInt16MultiArray *duty_msg = (const std_msgs__msg__UInt16MultiArray *)msgin;
 
-  tft.fillScreen(blackGroundColor);
+  // tft.fillScreen(blackGroundColor);
   // (condition) ? (true exec):(false exec)
 }
 void setup()
 {  
+  pinMode(top_button.PIN, INPUT_PULLUP);
+  attachInterrupt(top_button.PIN, IO_INT_ISR, RISING);
+
+
   tft.init();
   tft.setRotation(1);
   delay(2000);
   // set_microros_transports();
-  set_microros_wifi_transports("refine-wifi", "refinevistec", "10.42.0.1", 8888);
+  set_microros_wifi_transports("refine-wifi", "11223344", "10.42.0.1", 8888);
   delay(2000);
 
   allocator = rcl_get_default_allocator();
@@ -196,7 +230,7 @@ void setup()
   mode_msg.data.size = 1;
 
   //Filling some data
-  mode_msg.data.data[0] = 10;
+  mode_msg.data.data[2] = 10;
 
   /////////////////////////////////////////////////////////////////////////////////////// 
 
@@ -221,18 +255,10 @@ void loop()
   delay(100);
   RCCHECK(rclc_executor_spin_some(&executor_sub, RCL_MS_TO_NS(100)));
 
-  // if(mode_msg.data.data[0] == 'A'){
-  //   blackGroundColor = TFT_BLUE;
-  // }else if(mode_msg.data.data[0] == 'M'){
-  //   blackGroundColor = TFT_GREEN;
-  // }else{
-  //   blackGroundColor = TFT_RED;
-  // }
-
   tft.drawString(state_str+String(state_msg.data), 5, 0);
   tft.setTextSize(5);
   tft.drawString(String(mode_msg.data.data), 170, 0);
   tft.setTextSize(6);
   tft.drawString(force_str+String(force_msg.data)+force_unit, 5, 48);
-  tft.drawString(duty_str+String(duty_msg.data.data[0])+duty_unit, 5, 95);
+  tft.drawString(duty_str+String(duty_msg.data.data[2])+duty_unit, 5, 95);
 }
