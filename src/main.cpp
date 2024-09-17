@@ -17,6 +17,7 @@
 
 #include <std_msgs/msg/int8.h>
 #include <std_msgs/msg/int16.h>
+#include <std_msgs/msg/float32.h>
 #include <std_msgs/msg/string.h>
 #include <std_msgs/msg/u_int16_multi_array.h>
 
@@ -32,6 +33,9 @@ std_msgs__msg__Int8 state_msg;
 
 rcl_subscription_t sub_force;
 std_msgs__msg__Int16 force_msg;
+
+rcl_subscription_t sub_loadcell;
+std_msgs__msg__Float32 loadcell_msg;
 
 rcl_subscription_t sub_mode;
 std_msgs__msg__String mode_msg;
@@ -50,6 +54,8 @@ String duty_str = "D:";
 String duty_unit = "%";
 
 String mode_str = "M";
+String loadcell_str = "L:";
+
 
 int16_t blackGroundColor = TFT_BLACK;
 String current_modee = "N";
@@ -63,13 +69,27 @@ struct Button
   const uint8_t PIN;
   bool pressed;
 };
+
 Button top_button = {35, false};
+Button below_button = {0, false};
+
+
+int state_machine = 0;
 
 void IRAM_ATTR IO_INT_ISR()
 {
   // Toggle The state machine
   // top_button.pressed = true;
   tft.fillScreen(blackGroundColor);
+  state_machine = 0;
+}
+
+void IRAM_ATTR IO_INT_ISR2()
+{
+  // Toggle The state machine
+  // top_button.pressed = true;
+  tft.fillScreen(blackGroundColor);
+  state_machine = 1;
 }
 
 
@@ -116,6 +136,13 @@ void sub_state_callback(const void *msgin)
 void sub_force_callback(const void *msgin)
 {
   const std_msgs__msg__Int16 *force_msg = (const std_msgs__msg__Int16 *)msgin;
+  // tft.fillScreen(blackGroundColor);
+  // (condition) ? (true exec):(false exec)
+}
+
+void sub_loadcell_callback(const void *msgin)
+{
+  const std_msgs__msg__Float32 *loadcell_msg = (const std_msgs__msg__Float32 *)msgin;
   // tft.fillScreen(blackGroundColor);
   // (condition) ? (true exec):(false exec)
 }
@@ -193,6 +220,13 @@ void setup()
       "force_target"));
 
   RCCHECK(rclc_subscription_init_default(
+      &sub_loadcell,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32),
+      "loadcell_topic"));
+
+
+  RCCHECK(rclc_subscription_init_default(
       &sub_mode,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
@@ -239,10 +273,9 @@ void setup()
   RCCHECK(rclc_executor_init(&executor_sub, &support.context, 4, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor_sub, &sub_state, &state_msg, &sub_state_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor_sub, &sub_force, &force_msg, &sub_force_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor_sub, &sub_loadcell, &loadcell_msg, &sub_loadcell_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor_sub, &sub_mode, &mode_msg, &sub_mode_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor_sub, &sub_duty, &duty_msg, &sub_duty_callback, ON_NEW_DATA));
-
-
 
   tft.fillScreen(blackGroundColor);
   delay(50);
@@ -255,10 +288,19 @@ void loop()
   delay(100);
   RCCHECK(rclc_executor_spin_some(&executor_sub, RCL_MS_TO_NS(100)));
 
-  tft.drawString(state_str+String(state_msg.data), 5, 0);
-  tft.setTextSize(5);
-  tft.drawString(String(mode_msg.data.data), 170, 0);
-  tft.setTextSize(6);
-  tft.drawString(force_str+String(force_msg.data)+force_unit, 5, 48);
-  tft.drawString(duty_str+String(duty_msg.data.data[2])+duty_unit, 5, 95);
+  if(state_machine)
+  {
+    tft.setTextSize(6);
+    tft.drawString(loadcell_str+String(loadcell_msg.data)+force_unit, 5, 48);
+  }
+
+  else
+  {
+    tft.drawString(state_str+String(state_msg.data), 5, 0);
+    tft.setTextSize(5);
+    tft.drawString(String(mode_msg.data.data), 170, 0);
+    tft.setTextSize(6);
+    tft.drawString(force_str+String(force_msg.data)+force_unit, 5, 48);
+    tft.drawString(duty_str+String(duty_msg.data.data[2])+duty_unit, 5, 95);
+  }
 }
